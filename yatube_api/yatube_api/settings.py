@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'posts.apps.PostsConfig',
     'api.apps.ApiConfig',
+    'djoser',
 ]
 
 MIDDLEWARE = [
