@@ -1,7 +1,10 @@
 from rest_framework import viewsets
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 
 from posts.models import Post, Group, Comment
+from .permissions import PostAuthorOnly
 from .serializers import (
     PostSerializer,
     GroupSerializer,
@@ -14,18 +17,15 @@ class PostViewSet(viewsets.ModelViewSet):
     создать, отредактировать или удалить пост."""
     queryset = Post.objects.all()
     serializer_class = PostSerializer
+    permission_classes = [PostAuthorOnly, IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
     def perform_update(self, serializer):
-        if serializer.instance.author != self.request.user:
-            raise PermissionDenied('Нельзя изменять чужой контент!')
         super(PostViewSet, self).perform_update(serializer)
 
     def perform_destroy(self, instance):
-        if instance.author != self.request.user:
-            raise PermissionDenied('Нельзя изменять чужой контент!')
         super(PostViewSet, self).perform_destroy(instance)
 
 
@@ -39,21 +39,27 @@ class CommentViewSet(viewsets.ModelViewSet):
     """Вьюсет, отображающий информацию о комментариях поста и позволяющий
     создать, отредактировать или удалить комментарий."""
     serializer_class = CommentSerializer
+    permission_classes = [PostAuthorOnly, IsAuthenticated]
+
+    def post_finding(self):
+        return self.kwargs.get('post_id')
 
     def get_queryset(self):
-        queryset = Comment.objects.filter(post=self.kwargs.get('post_id'))
-        return queryset
+        try:
+            Comment.objects.filter(post=CommentViewSet.post_finding(self))
+        except Exception:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Comment.objects.filter(post=CommentViewSet.post_finding(self))
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user,
-                        post_id=self.kwargs.get('post_id'))
+        try:
+            serializer.save(author=self.request.user,
+                            post_id=CommentViewSet.post_finding(self))
+        except Exception:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
     def perform_update(self, serializer):
-        if serializer.instance.author != self.request.user:
-            raise PermissionDenied('Нельзя изменять чужой контент!')
         super(CommentViewSet, self).perform_update(serializer)
 
     def perform_destroy(self, instance):
-        if instance.author != self.request.user:
-            raise PermissionDenied('Нельзя изменять чужой контент!')
         super(CommentViewSet, self).perform_destroy(instance)
