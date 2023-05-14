@@ -1,7 +1,6 @@
 from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 
 from posts.models import Post, Group, Comment
 from .permissions import PostAuthorOnly
@@ -22,12 +21,6 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
-    def perform_update(self, serializer):
-        super(PostViewSet, self).perform_update(serializer)
-
-    def perform_destroy(self, instance):
-        super(PostViewSet, self).perform_destroy(instance)
-
 
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет, отображающий информацию о всех группах."""
@@ -42,24 +35,11 @@ class CommentViewSet(viewsets.ModelViewSet):
     permission_classes = [PostAuthorOnly, IsAuthenticated]
 
     def post_finding(self):
-        return self.kwargs.get('post_id')
+        return get_object_or_404(Post, id=self.kwargs.get('post_id'))
 
     def get_queryset(self):
-        try:
-            Comment.objects.filter(post=CommentViewSet.post_finding(self))
-        except Exception:
-            return Response(status=status.HTTP_404_NOT_FOUND)
         return Comment.objects.filter(post=CommentViewSet.post_finding(self))
 
     def perform_create(self, serializer):
-        try:
-            serializer.save(author=self.request.user,
-                            post_id=CommentViewSet.post_finding(self))
-        except Exception:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-    def perform_update(self, serializer):
-        super(CommentViewSet, self).perform_update(serializer)
-
-    def perform_destroy(self, instance):
-        super(CommentViewSet, self).perform_destroy(instance)
+        serializer.save(author=self.request.user,
+                        post=CommentViewSet.post_finding(self))
